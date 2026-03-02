@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html class="dark" lang="it">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>TCGLocation - Marketplace Premium</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd/idb-keyval-iife.min.js"></script>
+    
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet" />
+    
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#7200f5",
+                        "accent-blue": "#00d4ff",
+                        "background-light": "#f7f5f8",
+                        "background-dark": "#0a0a0b",
+                        "card-dark": "#16111d",
+                        "border-dark": "#2d2438",
+                    },
+                    fontFamily: { "display": ["Inter", "sans-serif"] },
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass-nav { background: rgba(10, 10, 11, 0.8); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(114, 0, 245, 0.2); }
+        .card-gradient:hover { box-shadow: 0 0 20px rgba(114, 0, 245, 0.25); transform: translateY(-4px); transition: all 0.3s ease; }
+        
+        /* Notifiche Toast */
+        #notification-container { position: fixed; top: 24px; right: 24px; z-index: 1000; display: flex; flex-direction: column; gap: 12px; }
+        .toast { background: rgba(22, 17, 29, 0.9); backdrop-filter: blur(8px); border: 1px solid rgba(114, 0, 245, 0.5); padding: 16px 24px; border-radius: 12px; color: white; display: flex; align-items: center; gap: 12px; animation: slideIn 0.3s ease-out forwards; }
+        
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        .btn-loading { position: relative; color: transparent !important; pointer-events: none; }
+        .btn-loading::after { content: ""; position: absolute; width: 20px; height: 20px; top: calc(50% - 10px); left: calc(50% - 10px); border: 2px solid white; border-radius: 50%; border-top-color: transparent; animation: spin 0.8s linear infinite; }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Animazione per immagini caricate dalla cache */
+        .img-fade-in { animation: fadeIn 0.6s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; filter: grayscale(100%); } to { opacity: 1; filter: grayscale(0%); } }
+    </style>
+</head>
+
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen font-display">
+    <nav class="glass-nav sticky top-0 z-50 w-full">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-2">
+                    <div class="bg-primary p-1.5 rounded-lg shadow-[0_0_15px_rgba(114,0,245,0.4)]">
+                        <span class="material-symbols-outlined text-white text-2xl">radar</span>
+                    </div>
+                    <div class="flex flex-col leading-none">
+                        <span class="text-xl font-black tracking-tighter text-slate-900 dark:text-white uppercase italic">TCG<span class="text-primary not-italic">Location</span></span>
+                        <span class="text-[8px] font-bold text-slate-500 tracking-[0.2em] uppercase ml-0.5 font-display">Digital Twin Shop</span>
+                    </div>
+                </div>
+                
+                <div class="hidden md:block flex-1 max-w-md mx-8">
+                    <div class="relative group">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="material-symbols-outlined text-slate-400 group-focus-within:text-primary transition-colors">search</span>
+                        </div>
+                        <input id="search-input" class="block w-full pl-10 pr-3 py-2 border-0 rounded-xl bg-slate-200/50 dark:bg-card-dark text-slate-900 dark:text-white placeholder-slate-500 focus:ring-2 focus:ring-primary transition-all text-sm" placeholder="Cerca nel catalogo locale..." type="text" />
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <div id="auth-header" class="flex items-center gap-4">
+                        <button onclick="openAuthModal()" class="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg hover:bg-primary hover:text-white transition-all text-sm font-semibold">Accedi</button>
+                    </div>
+                    <button onclick="triggerCsvUpload()" class="p-2 text-slate-500 hover:text-primary transition-colors flex items-center gap-2 border border-slate-300 dark:border-border-dark rounded-lg hover:bg-slate-200 dark:hover:bg-card-dark">
+                        <span class="material-symbols-outlined text-xl">upload_file</span>
+                        <span class="text-xs font-bold uppercase tracking-wider hidden lg:inline">Carica CSV</span>
+                    </button>
+                    <input type="file" id="csv-input" accept=".csv" class="hidden" onchange="handleFileSelect(event)">
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+            <div>
+                <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight italic uppercase">Marketplace <span class="text-primary">Premium</span></h1>
+                <p class="text-slate-500 dark:text-slate-400 mt-1">Dati sincronizzati e immagini salvate localmente per la massima velocità.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="flex flex-col">
+                    <span class="text-[10px] font-bold text-slate-500 mb-1 ml-1 uppercase tracking-widest">Espansione</span>
+                    <select id="expansion-filter" class="bg-slate-200/50 dark:bg-card-dark border-0 rounded-lg text-sm text-slate-900 dark:text-white focus:ring-primary min-w-[200px]"></select>
+                </div>
+            </div>
+        </div>
+
+        <div id="catalog-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            </div>
+
+        <div class="mt-12 pt-8 border-t border-slate-200 dark:border-border-dark flex items-center justify-between">
+            <div class="flex flex-col">
+                <span class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Valore Totale Asset</span>
+                <span id="total-asset-value" class="text-2xl font-black text-primary italic leading-none">€0,00</span>
+            </div>
+        </div>
+    </main>
+
+    <div class="fixed bottom-6 right-6 hidden xl:block">
+        <div class="bg-card-dark/90 backdrop-blur-xl border border-primary/30 p-4 rounded-xl shadow-2xl min-w-[220px]">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-white/5">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary text-sm animate-pulse">terminal</span>
+                    <span class="text-[10px] font-black uppercase tracking-widest text-white">System Status</span>
+                </div>
+                <button onclick="clearLocalCache()" title="Svuota Cache Immagini" class="text-slate-500 hover:text-red-500 transition-all hover:rotate-90">
+                    <span class="material-symbols-outlined text-sm">delete_sweep</span>
+                </button>
+            </div>
+            <div class="space-y-2.5">
+                <div class="flex items-center justify-between gap-4">
+                    <span class="text-[9px] text-slate-400 uppercase font-bold">Cloud (Supabase)</span>
+                    <span id="db-status" class="text-[9px] text-green-500 font-black uppercase tracking-tighter">Online</span>
+                </div>
+                <div class="flex items-center justify-between gap-4">
+                    <span class="text-[9px] text-slate-400 uppercase font-bold">Storage Locale</span>
+                    <span class="text-[9px] text-accent-blue font-black uppercase tracking-tighter">IndexedDB</span>
+                </div>
+                <div class="flex items-center justify-between gap-4">
+                    <span class="text-[9px] text-slate-400 uppercase font-bold">Latenza</span>
+                    <span id="api-latency" class="text-[9px] text-slate-300 font-mono">0ms</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="auth-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-background-dark/80 backdrop-blur-sm" onclick="closeAuthModal()"></div>
+        <div class="relative w-full max-w-md bg-card-dark border border-border-dark rounded-2xl shadow-2xl overflow-hidden">
+            <div class="flex border-b border-border-dark">
+                <button onclick="switchAuthTab('login')" id="tab-login" class="flex-1 py-4 text-sm font-bold border-b-2 border-primary text-white uppercase italic tracking-wider">Accedi</button>
+                <button onclick="switchAuthTab('register')" id="tab-register" class="flex-1 py-4 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-white transition-colors uppercase italic tracking-wider">Registrati</button>
+            </div>
+            <div class="p-8">
+                <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+                    <div id="register-fields" class="hidden space-y-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1 leading-none">Username</label>
+                            <input type="text" id="auth-username" class="w-full px-4 py-3 bg-background-dark border-0 rounded-xl text-white placeholder-slate-600 focus:ring-2 focus:ring-primary transition-all text-sm" placeholder="Il tuo nome">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1 leading-none">Email</label>
+                        <input type="email" id="auth-email" required class="w-full px-4 py-3 bg-background-dark border-0 rounded-xl text-white placeholder-slate-600 focus:ring-2 focus:ring-primary transition-all text-sm" placeholder="email@esempio.com">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1 leading-none">Password</label>
+                        <input type="password" id="auth-password" required class="w-full px-4 py-3 bg-background-dark border-0 rounded-xl text-white placeholder-slate-600 focus:ring-2 focus:ring-primary transition-all text-sm" placeholder="••••••••">
+                    </div>
+                    <button type="submit" id="auth-submit-btn" class="w-full py-3 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold text-sm shadow-lg shadow-primary/20 transition-all mt-4 uppercase italic">Conferma Operazione</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
+</body>
+</html>
